@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mesh Generation Visualizer</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #f0f0f0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        canvas {
+            border: 2px solid #333;
+            background: white;
+            margin: 10px;
+            display: block;
+        }
+        .controls {
+            margin: 20px 0;
+            text-align: center;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        h1, h2 {
+            text-align: center;
+        }
+        .info {
+            text-align: center;
+            margin: 10px 0;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Mesh Generation Competition Solution</h1>
+        
+        <div class="controls">
+            <button onclick="loadDataset1()">Load Dataset 1 (Simple Polygon)</button>
+            <button onclick="loadDataset2()">Load Dataset 2 (Self-Intersecting)</button>
+            <button onclick="toggleWireframe()">Toggle Wireframe</button>
+            <button onclick="clearCanvas()">Clear</button>
+        </div>
+        
+        <div class="info">
+            <p>Dataset 1: Simple concave polygon (bird/airplane shape)</p>
+            <p>Dataset 2: Self-intersecting polygon with holes</p>
+        </div>
+        
+        <canvas id="canvas" width="800" height="600"></canvas>
+        
+        <div id="stats" class="info"></div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let showWireframe = false;
+        let currentTriangles = [];
+        let currentVertices = [];
+
+        // Dataset 1 points (simplified for visualization)
+        const dataset1 = [
+            [105.476349, 137.4561], [104.050629, 137.638077], [103.337517, 137.701874],
+            [103.210823, 137.668579], [103.544304, 137.559235], [104.211754, 137.394867],
+            [105.086922, 137.196564], [106.043625, 136.985367], [106.955627, 136.782333],
+            [107.6967, 136.608521], [108.140625, 136.484985], [108.394455, 136.397934],
+            [108.648544, 136.317825], [108.901657, 136.242218], [109.152542, 136.1686],
+            [109.399986, 136.094452], [109.642738, 136.017273], [109.879555, 135.934586],
+            [110.109207, 135.843826], [110.330444, 135.742584], [110.542053, 135.6283],
+            [110.743889, 135.499039], [110.937164, 135.356384], [111.122665, 135.202927],
+            [111.301147, 135.041412], [111.473389, 134.874466], [111.640167, 134.7048],
+            [111.802238, 134.53508], [111.960381, 134.367966], [112.115372, 134.206116],
+            [112.267982, 134.052261], [112.417976, 133.9113], [112.564423, 133.7832],
+            [112.707062, 133.6632], [112.845612, 133.546509], [112.97979, 133.428345],
+            [113.109306, 133.30397], [113.233917, 133.168564], [113.353333, 133.017349],
+            [113.467262, 132.845581], [113.575455, 132.648453], [113.666855, 132.4283],
+            [113.735641, 132.19133], [113.7893, 131.93869], [113.835365, 131.671463],
+            [113.881317, 131.390808], [113.934692, 131.0978], [114.002975, 130.793533],
+            [114.093674, 130.479187], [114.214317, 130.1558], [114.372391, 129.824539],
+            [114.536011, 129.47435], [114.67968, 129.0979], [114.820465, 128.702],
+            [114.975494, 128.293365], [115.161827, 127.878723], [115.396576, 127.464836],
+            [115.696815, 127.058456], [116.079659, 126.666306], [116.56218, 126.295166],
+            [117.161476, 125.951721], [117.94249, 125.593094], [118.923569, 125.188393],
+            [120.051926, 124.762527], [121.274773, 124.340363], [122.539322, 123.946777],
+            [123.7928, 123.606644], [124.982407, 123.344864], [126.055344, 123.18631],
+            [126.958862, 123.155853], [127.640137, 123.278389], [128.093552, 123.60215],
+            [128.370758, 124.128136], [128.504791, 124.810379], [128.528748, 125.602867],
+            [128.475677, 126.459641], [128.3787, 127.3347], [128.270828, 128.182053],
+            [128.185211, 128.955734], [128.154861, 129.609726], [128.2129, 130.098083],
+            [128.330154, 130.442047], [128.456131, 130.701126], [128.5919, 130.886719],
+            [128.7385, 131.010132], [128.896988, 131.0828], [129.068451, 131.116028],
+            [129.253922, 131.121231], [129.454468, 131.109756], [129.671143, 131.092957],
+            [129.905, 131.082214], [130.161621, 131.057083], [130.442978, 130.9944],
+            [130.744812, 130.901474], [131.062775, 130.785645], [131.392624, 130.654236],
+            [131.73, 130.514572], [132.070648, 130.373947], [132.410263, 130.239685],
+            [132.744537, 130.119141], [133.0692, 130.019592], [133.388077, 129.932434],
+            [133.707764, 129.84523], [134.028091, 129.7597], [134.348877, 129.677551],
+            [134.669952, 129.600449], [134.9911, 129.5301], [135.31218, 129.468246],
+            [135.632965, 129.4165], [135.953339, 129.376633], [136.273087, 129.350266],
+            [136.5939, 129.340408], [136.916885, 129.346924], [137.241058, 129.366928],
+            [137.565369, 129.397476], [137.888779, 129.435669], [138.210266, 129.478577],
+            [138.528824, 129.5233], [138.8434, 129.56694], [139.152985, 129.606567],
+            [139.456512, 129.639267], [139.755371, 129.661423], [140.051392, 129.674042],
+            [140.344223, 129.681168], [140.63353, 129.6868], [140.918961, 129.695023],
+            [141.200226, 129.709824], [141.476974, 129.735245], [141.748871, 129.77533],
+            [142.015579, 129.8341], [142.276779, 129.915634], [142.717316, 130.003036],
+            [143.440216, 130.082809], [144.322464, 130.16391], [145.241013, 130.255356],
+            [146.072754, 130.366074], [146.694672, 130.505081], [146.983688, 130.681366],
+            [146.816757, 130.90387], [146.070831, 131.1816], [144.622879, 131.523544],
+            [142.200531, 131.972717], [138.780121, 132.543747], [134.611588, 133.202927],
+            [129.944809, 133.91655], [125.029739, 134.651016], [120.116234, 135.372559],
+            [115.454231, 136.047516], [111.293655, 136.642227], [107.884384, 137.122971]
+        ];
+
+        // Simplified dataset 2 for demonstration
+        const dataset2 = [
+            [105.5294, 137.53157], [104.142189, 137.8048], [103.48465, 137.9875],
+            [103.427757, 138.094254], [103.842476, 138.139542], [104.599747, 138.137924],
+            [105.570572, 138.103912], [106.625893, 138.052017], [107.636673, 137.99678],
+            [108.473892, 137.952728], [109.008522, 137.934372], [109.348167, 137.928162],
+            [120.327431, 134.628235], [121.452583, 134.063049], [122.625443, 133.6568],
+            [124.280144, 133.316666], [126.422066, 133.141144], [128.223831, 133.044052],
+            [130.00885, 133.221359], [131.566437, 134.344147], [132.662582, 135.9801],
+            [133.537582, 137.58696], [133.991119, 138.454208], [133.876633, 138.523849],
+            [133.529831, 138.254578], [133.374664, 138.091629], [133.420166, 138.22348],
+            [133.579163, 138.4307], [134.131165, 138.546753], [135.412109, 138.479553],
+            [137.429062, 138.322784], [139.50975, 137.967255], [141.351425, 136.908417],
+            [142.197174, 135.579269], [142.933945, 133.879868], [143.279312, 133.038345],
+            [143.249954, 132.773941], [143.343353, 132.4746], [144.228592, 132.153549],
+            [146.604477, 131.523071], [147.196259, 131.215424], [144.90976, 131.468292],
+            [138.968521, 132.319061], [130.048523, 133.6563], [120.161118, 135.174469],
+            [111.317604, 136.568085], [107.915878, 137.122681]
+        ];
+
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            currentTriangles = [];
+            currentVertices = [];
+            updateStats();
+        }
+
+        function normalizePoints(points) {
+            if (points.length === 0) return [];
+            
+            let minX = Math.min(...points.map(p => p[0]));
+            let maxX = Math.max(...points.map(p => p[0]));
+            let minY = Math.min(...points.map(p => p[1]));
+            let maxY = Math.max(...points.map(p => p[1]));
+            
+            let scaleX = (canvas.width - 100) / (maxX - minX);
+            let scaleY = (canvas.height - 100) / (maxY - minY);
+            let scale = Math.min(scaleX, scaleY);
+            
+            let offsetX = (canvas.width - (maxX - minX) * scale) / 2;
+            let offsetY = (canvas.height - (maxY - minY) * scale) / 2;
+            
+            return points.map(p => [
+                (p[0] - minX) * scale + offsetX,
+                (p[1] - minY) * scale + offsetY
+            ]);
+        }
+
+        function hasSelfintersections(polygon) {
+            const n = polygon.length;
+            for (let i = 0; i < n; i++) {
+                for (let j = i + 2; j < n; j++) {
+                    if (i === 0 && j === n - 1) continue;
+                    
+                    if (lineSegmentsIntersect(
+                        polygon[i], polygon[(i + 1) % n],
+                        polygon[j], polygon[(j + 1) % n]
+                    )) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        function lineSegmentsIntersect(p1, p2, p3, p4) {
+            function cross(a, b) {
+                return a[0] * b[1] - a[1] * b[0];
+            }
+            
+            const d1 = cross([p4[0] - p3[0], p4[1] - p3[1]], [p1[0] - p3[0], p1[1] - p3[1]]);
+            const d2 = cross([p4[0] - p3[0], p4[1] - p3[1]], [p2[0] - p3[0], p2[1] - p3[1]]);
+            const d3 = cross([p2[0] - p1[0], p2[1] - p1[1]], [p3[0] - p1[0], p3[1] - p1[1]]);
+            const d4 = cross([p2[0] - p1[0], p2[1] - p1[1]], [p4[0] - p1[0], p4[1] - p1[1]]);
+            
+            return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
+                   ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0));
+        }
+
+        function isInsidePolygon(point, polygon) {
+            let crossings = 0;
+            const n = polygon.length;
+            
+            for (let i = 0; i < n; i++) {
+                const a = polygon[i];
+                const b = polygon[(i + 1) % n];
+                
+                if (((a[1] <= point[1]) && (point[1] < b[1])) || 
+                    ((b[1] <= point[1]) && (point[1] < a[1]))) {
+                    const x = a[0] + (point[1] - a[1]) * (b[0] - a[0]) / (b[1] - a[1]);
+                    if (point[0] < x) crossings++;
+                }
+            }
+            
+            return (crossings % 2) === 1;
+        }
+
+        function triangulatePolygon(polygon) {
+            const vertices = [];
+            const triangles = [];
+            
+            if (hasSelfintersections(polygon)) {
+                // Grid-based triangulation for self-intersecting polygons
+                const minX = Math.min(...polygon.map(p => p[0]));
+                const maxX = Math.max(...polygon.map(p => p[0]));
+                const minY = Math.min(...polygon.map(p => p[1]));
+                const maxY = Math.max(...polygon.map(p => p[1]));
+                
+                const gridRes = 40;
+                const stepX = (maxX - minX) / gridRes;
+                const stepY = (maxY - minY) / gridRes;
+                
+                for (let i = 0; i < gridRes; i++) {
+                    for (let j = 0; j < gridRes; j++) {
+                        const x = minX + i * stepX;
+                        const y = minY + j * stepY;
+                        const center = [x + stepX * 0.5, y + stepY * 0.5];
+                        
+                        if (isInsidePolygon(center, polygon)) {
+                            const baseIdx = vertices.length;
+                            
+                            vertices.push([x, y]);
+                            vertices.push([x + stepX, y]);
+                            vertices.push([x, y + stepY]);
+                            vertices.push([x + stepX, y + stepY]);
+                            
+                            triangles.push([baseIdx, baseIdx + 1, baseIdx + 2]);
+                            triangles.push([baseIdx + 1, baseIdx + 3, baseIdx + 2]);
+                        }
+                    }
+                }
+            } else {
+                // Simple ear clipping for non-self-intersecting polygons
+                vertices.push(...polygon);
+                
+                const indices = polygon.map((_, i) => i);
+                
+                while (indices.length > 3) {
+                    let earFound = false;
+                    
+                    for (let i = 0; i < indices.length; i++) {
+                        const prev = indices[(i - 1 + indices.length) % indices.length];
+                        const curr = indices[i];
+                        const next = indices[(i + 1) % indices.length];
+                        
+                        if (isEar(polygon, prev, curr, next, indices)) {
+                            triangles.push([prev, curr, next]);
+                            indices.splice(i, 1);
+                            earFound = true;
+                            break;
+                        }
+                    }
+                    
+                    if (!earFound) break;
+                }
+                
+                if (indices.length === 3) {
+                    triangles.push([indices[0], indices[1], indices[2]]);
+                }
+            }
+            
+            return { vertices, triangles };
+        }
+
+        function isEar(polygon, prev, curr, next, indices) {
+            const a = polygon[prev];
+            const b = polygon[curr];
+            const c = polygon[next];
+            
+            // Check if triangle is convex
+            const cross = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+            if (cross <= 0) return false;
+            
+            // Check if any vertex is inside this triangle
+            for (const idx of indices) {
+                if (idx === prev || idx === curr || idx === next) continue;
+                if (pointInTriangle(polygon[idx], a, b, c)) return false;
+            }
+            
+            return true;
+        }
+
+        function pointInTriangle(p, a, b, c) {
+            function cross(v1, v2) {
+                return v1[0] * v2[1] - v1[1] * v2[0];
+            }
+            
+            const d1 = cross([b[0] - a[0], b[1] - a[1]], [p[0] - a[0], p[1] - a[1]]);
+            const d2 = cross([c[0] - b[0], c[1] - b[1]], [p[0] - b[0], p[1] - b[1]]);
+            const d3 = cross([a[0] - c[0], a[1] - c[1]], [p[0] - c[0], p[1] - c[1]]);
+            
+            const hasNeg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+            const hasPos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+            
+            return !(hasNeg && hasPos);
+        }
+
+        function drawMesh(vertices, triangles) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw filled triangles
+            if (!showWireframe) {
+                ctx.fillStyle = 'rgba(50, 200, 50, 0.6)';
+                for (const tri of triangles) {
+                    ctx.beginPath();
+                    ctx.moveTo(vertices[tri[0]][0], vertices[tri[0]][1]);
+                    ctx.lineTo(vertices[tri[1]][0], vertices[tri[1]][1]);
+                    ctx.lineTo(vertices[tri[2]][0], vertices[tri[2]][1]);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+            }
+            
+            // Draw wireframe
+            ctx.strokeStyle = showWireframe ? '#333' : 'rgba(0, 0, 0, 0.2)';
+            ctx.lineWidth = showWireframe ? 1 : 0.5;
+            for (const tri of triangles) {
+                ctx.beginPath();
+                ctx.moveTo(vertices[tri[0]][0], vertices[tri[0]][1]);
+                ctx.lineTo(vertices[tri[1]][0], vertices[tri[1]][1]);
+                ctx.lineTo(vertices[tri[2]][0], vertices[tri[2]][1]);
+                ctx.closePath();
+                ctx.stroke();
+            }
+        }
+
+        function loadDataset1() {
+            const normalized = normalizePoints(dataset1);
+            const result = triangulatePolygon(normalized);
+            currentVertices = result.vertices;
+            currentTriangles = result.triangles;
+            drawMesh(currentVertices, currentTriangles);
+            updateStats();
+        }
+
+        function loadDataset2() {
+            const normalized = normalizePoints(dataset2);
+            const result = triangulatePolygon(normalized);
+            currentVertices = result.vertices;
+            currentTriangles = result.triangles;
+            drawMesh(currentVertices, currentTriangles);
+            updateStats();
+        }
+
+        function toggleWireframe() {
+            showWireframe = !showWireframe;
+            if (currentTriangles.length > 0) {
+                drawMesh(currentVertices, currentTriangles);
+            }
+        }
+
+        function updateStats() {
+            const stats = document.getElementById('stats');
+            stats.innerHTML = `Vertices: ${currentVertices.length} | Triangles: ${currentTriangles.length}`;
+        }
+
+        // Initial load
+        loadDataset1();
+    </script>
+</body>
+</html>
